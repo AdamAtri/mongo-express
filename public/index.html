@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>MongoExpress</title>
+    <script
+      src="https://code.jquery.com/jquery-3.3.1.min.js"
+      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      crossorigin="anonymous">
+    </script>
+  </head>
+  <body>
+
+    <!-- Form for entering StarWars Quote -->
+    <form id="shitform">
+      <input type="text" name="name" value="" placeholder="name">
+      <input type="text" name="quote" value="" placeholder="quote">
+      <button id="shitformBtn" type="button" name="button">Quote</button>
+    </form>
+
+    <!-- Display existing quotes here -->
+    <ul id="quotes"></ul>
+
+
+    <script type="text/javascript">
+      // delete the selected quote.
+      function onDelete(e) {
+        // e.target will be a .delete-btn from a parent <li>
+        // get the <li>
+        const li = e.target.parentElement;
+        $.ajax({
+          url: 'http://localhost:1976/quotes',
+          data: {_id: li.id },
+          method: 'DELETE',
+          success: onLoad
+        });
+      }
+
+      // update has two parts: 1) make the quote editable. 2) notify server
+      function onUpdate(e) {
+        // make the quote editable
+        const parent = e.target.parentElement;
+        parent.setAttribute('contenteditable', true);
+        parent.focus();
+        // select the text of the quote so that it can immediately be overwritten.
+        window.getSelection().removeAllRanges();
+        const range = document.createRange();
+        range.selectNodeContents($(parent).find('.quote-text')[0]);
+        window.getSelection().addRange(range);
+
+        // remove the current click handler from the update-btn
+        //  and add one to push the data.
+        $(e.target).off('click', onUpdate).on('click', () => {
+          const
+            name = $(parent).find('.quote-name')[0],
+            quote = $(parent).find('.quote-text')[0];
+          const body = {
+            _id: parent.id,
+            name: name.innerText.slice(1),
+            quote: quote.innerText
+          };
+          console.log(body);
+          $.ajax({
+            url:'http://localhost:1976/quotes',
+            data: body,
+            method: 'PUT',
+            success: (response) => {
+              // when the response is received, remove contenteditable attribute
+              //  then pass the data to onLoad
+              Promise.resolve(response)
+                .then( res => {
+                  parent.removeAttribute('contenteditable');
+                  window.focus(null);
+                  window.getSelection().removeAllRanges();
+                  return res;
+                })
+                .then( onLoad );
+            }
+          });
+        });
+      }
+
+      // load the JSON response data
+      function onLoad(response) {
+        if(response instanceof Array) {
+          var quotes = response.map( quote => {
+            return `<li id=${quote._id} class="quote-item">
+                <div class="quote-text">${quote.quote}</div>
+                <div class="quote-name">-${quote.name}</div>
+                <button class="delete-btn">X</button>
+                <button class="update-btn">U</button>
+              </li>`;
+          });
+          $('#quotes').html(quotes);
+          $('.delete-btn').on('click', onDelete);
+          $('.update-btn').on('click', onUpdate);
+        };
+      }
+
+      // parse the form body and send the quote.
+      // absolutely zero integrity checks here. not prod-ready.
+      function sendquote() {
+        const shitform = $('#shitform')[0];
+        const body = {name: shitform.name.value, quote: shitform.quote.value};
+        $.ajax({
+          url: 'http://localhost:1976/quotes',
+          data: body,
+          method:"POST",
+          success: onLoad
+        });
+      }
+    </script>
+
+    <script type="text/javascript">
+      // add listener to send the quote to the server
+      $('#shitformBtn').on('click', sendquote);
+
+      // request the current quotes
+      $.ajax({
+        url: 'http://localhost:1976/quotes',
+        success: onLoad
+      });
+    </script>
+  </body>
+</html>
